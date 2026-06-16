@@ -74,6 +74,7 @@ class LMStudioClient:
                         }
                     ],
                     "max_tokens": 4096,
+                    "num_predict": settings.vlm_max_tokens,
                     "temperature": 0.1
                 }
                 
@@ -129,7 +130,8 @@ class LMStudioClient:
                     "images": [image_base64],
                     "stream": False,
                     "options": {
-                        "temperature": 0.1
+                        "temperature": 0.1,
+                        "num_predict": settings.vlm_max_tokens
                     }
                 }
 

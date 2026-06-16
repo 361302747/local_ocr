@@ -3,68 +3,56 @@ chcp 65001 >nul 2>&1
 setlocal
 cd /d "%~dp0"
 
-set "OLLAMA_HOST=127.0.0.1:11434"
-set "OLLAMA_BASE_URL=http://127.0.0.1:11434"
-set "OCR_MODEL=glm-ocr"
-
-set "HOST=127.0.0.1"
+set "HOST=0.0.0.0"
 set "PORT=8765"
 set "OCR_ENGINE=none"
-set "LMSTUDIO_API_URL=%OLLAMA_BASE_URL%/api/generate"
-set "LMSTUDIO_MODEL=%OCR_MODEL%"
+set "LMSTUDIO_BASE_URL=http://127.0.0.1:1234"
+set "LMSTUDIO_API_URL=%LMSTUDIO_BASE_URL%/v1/chat/completions"
+set "LMSTUDIO_MODEL=glm-ocr"
 set "LMSTUDIO_TIMEOUT=120"
-set "VLM_API_MODE=ollama"
+set "VLM_API_MODE=openai"
+set "VLM_MAX_TOKENS=512"
 
 echo ====================================
 echo Local OCR Service Starting...
+echo Backend: LM Studio
 echo ====================================
 echo.
 
-where ollama >nul 2>nul
-if errorlevel 1 (
-    echo [ERROR] Ollama was not found.
-    echo [INFO] Install it first:
-    echo        https://ollama.com/download/windows
-    pause
-    exit /b 1
-)
-
-echo [INFO] Checking Ollama service on %OLLAMA_BASE_URL% ...
+echo [INFO] Checking LM Studio local server on %LMSTUDIO_BASE_URL% ...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$ok=$false; try { Invoke-RestMethod '%OLLAMA_BASE_URL%/api/tags' -TimeoutSec 2 | Out-Null; $ok=$true } catch {}; if (-not $ok) { exit 1 }"
+  "try { Invoke-RestMethod '%LMSTUDIO_BASE_URL%/v1/models' -TimeoutSec 3 | Out-Null; exit 0 } catch { exit 1 }"
 if errorlevel 1 (
-    echo [INFO] Starting Ollama service...
-    start "Ollama" /min ollama serve
+    echo [ERROR] LM Studio local server is not available.
+    echo [INFO] Please open LM Studio, load the GLM-OCR model, and start Local Server.
+    echo [INFO] Expected endpoint: %LMSTUDIO_API_URL%
+    set "EXIT_CODE=1"
+    goto :finish
 )
 
-echo [INFO] Waiting for Ollama service...
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$deadline=(Get-Date).AddSeconds(30); while((Get-Date) -lt $deadline) { try { Invoke-RestMethod '%OLLAMA_BASE_URL%/api/tags' -TimeoutSec 2 | Out-Null; exit 0 } catch { Start-Sleep -Seconds 1 } }; exit 1"
-if errorlevel 1 (
-    echo [ERROR] Ollama service did not become ready.
-    pause
-    exit /b 1
-)
-
-echo [INFO] Checking model: %OCR_MODEL%
-ollama list | findstr /i /c:"%OCR_MODEL%" >nul 2>nul
-if errorlevel 1 (
-    echo [INFO] Pulling model %OCR_MODEL% ...
-    ollama pull %OCR_MODEL%
-    if errorlevel 1 (
-        echo [ERROR] Failed to pull %OCR_MODEL%.
-        pause
-        exit /b 1
-    )
-)
+echo [INFO] LM Studio local server is available.
 
 echo.
-echo [INFO] Ollama:   %OLLAMA_BASE_URL%
-echo [INFO] Model:    %OCR_MODEL%
-echo [INFO] LocalOCR: http://127.0.0.1:%PORT%
-echo [INFO] API Docs: http://127.0.0.1:%PORT%/docs
+echo [INFO] Backend:  %LMSTUDIO_BASE_URL%
+echo [INFO] Model:    %LMSTUDIO_MODEL%
+echo [INFO] LocalOCR: http://%COMPUTERNAME%:%PORT%
+echo [INFO] API Docs: http://%COMPUTERNAME%:%PORT%/docs
 echo.
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "if (Get-NetTCPConnection -LocalPort %PORT% -State Listen -ErrorAction SilentlyContinue) { exit 0 }; exit 1"
+if not errorlevel 1 (
+    echo [INFO] local_ocr is already running on port %PORT%.
+    set "EXIT_CODE=0"
+    goto :finish
+)
 
 uv run python main.py
+set "EXIT_CODE=%ERRORLEVEL%"
 
+:finish
+echo.
+if "%EXIT_CODE%"=="" set "EXIT_CODE=0"
+echo [INFO] Script finished with exit code %EXIT_CODE%.
 pause
+exit /b %EXIT_CODE%

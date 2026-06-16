@@ -10,15 +10,17 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8765
     
-    ocr_engine: str = "easyocr"
+    ocr_engine: str = "none"
+    ocr_lazy_engine: str = "easyocr"
     ocr_languages: List[str] = ["ch_sim"]
     ocr_use_gpu: bool = True
     ocr_charset_file: str = "resource/common_ch_sim_clean.txt"
     
-    lmstudio_api_url: str = "http://localhost:1234/v1/chat/completions"
+    lmstudio_api_url: str = "http://127.0.0.1:1234/v1/chat/completions"
     lmstudio_model: str = "glm-ocr"
-    lmstudio_timeout: int = 60
+    lmstudio_timeout: int = 120
     vlm_api_mode: str = "openai"
+    vlm_max_tokens: int = 512
     
     tesseract_cmd: Optional[str] = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
     

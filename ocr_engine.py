@@ -108,10 +108,11 @@ class OCREngine:
         tesseract_cmd: Optional[str] = None,
         charset_file: Optional[str] = None
     ):
-        if OCREngine._initialized:
+        requested_engine_type = engine_type.lower()
+        if OCREngine._initialized and self.engine_type == requested_engine_type:
             return
         
-        self.engine_type = engine_type.lower()
+        self.engine_type = requested_engine_type
         self.languages = languages or ['ch_sim']
         self.use_gpu = use_gpu
         self.tesseract_cmd = tesseract_cmd

@@ -2,10 +2,13 @@
 OCR服务主程序 - 提供HTTP API接口
 支持本地OCR引擎和LMStudio OCR识别
 """
+import asyncio
 import logging
+from contextlib import asynccontextmanager
 from typing import Optional, List
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import uvicorn
 import numpy as np
@@ -24,33 +27,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-app = FastAPI(
-    title="OCR服务",
-    description="统一的OCR识别服务，支持本地OCR引擎和LMStudio OCR",
-    version="1.0.0"
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-from fastapi.responses import JSONResponse
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    import traceback
-    error_msg = str(exc)
-    trace = traceback.format_exc()
-    logger.error(f"全局异常: {error_msg}\n{trace}")
-    return JSONResponse(
-        status_code=500,
-        content={"success": False, "error": error_msg, "traceback": trace}
-    )
+_local_ocr_load_lock = asyncio.Lock()
 
 
 class TextBlock(BaseModel):
@@ -158,8 +135,7 @@ class HealthResponse(BaseModel):
     lmstudio_available: bool = False
 
 
-@app.on_event("startup")
-async def startup_event():
+async def initialize_services():
     """应用启动时初始化OCR引擎"""
     logger.info("=" * 50)
     logger.info("OCR服务启动中...")
@@ -181,10 +157,73 @@ async def startup_event():
         engine = get_ocr_engine()
         if engine and engine.is_available:
             logger.info(f"OCR引擎初始化成功: {engine.current_engine_type}")
+        elif settings.ocr_engine.lower() in ("none", "disabled", "off"):
+            logger.info("本地OCR引擎启动时不加载，将在调用 /ocr 时按需加载")
         else:
             logger.warning("OCR引擎初始化失败，请检查依赖安装")
     except Exception as e:
         logger.error(f"OCR引擎初始化异常: {e}")
+
+
+async def ensure_local_ocr_engine():
+    """按需加载本地OCR引擎，用于需要 bbox 位置的 /ocr 接口。"""
+    engine = get_ocr_engine()
+    if engine and engine.is_available:
+        return engine
+
+    lazy_engine = settings.ocr_lazy_engine.lower()
+    if lazy_engine in ("none", "disabled", "off"):
+        return engine
+
+    async with _local_ocr_load_lock:
+        engine = get_ocr_engine()
+        if engine and engine.is_available:
+            return engine
+
+        logger.info(f"按需加载本地OCR引擎: {settings.ocr_lazy_engine}")
+        charset_path = str(PROJECT_ROOT / settings.ocr_charset_file) if settings.ocr_charset_file else None
+        return await asyncio.to_thread(
+            init_ocr_engine,
+            engine_type=settings.ocr_lazy_engine,
+            languages=settings.ocr_languages,
+            use_gpu=settings.ocr_use_gpu,
+            tesseract_cmd=settings.tesseract_cmd,
+            charset_file=charset_path,
+        )
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await initialize_services()
+    yield
+
+
+app = FastAPI(
+    title="OCR服务",
+    description="统一的OCR识别服务，支持本地OCR引擎和LMStudio OCR",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    import traceback
+    error_msg = str(exc)
+    trace = traceback.format_exc()
+    logger.error(f"全局异常: {error_msg}\n{trace}")
+    return JSONResponse(
+        status_code=500,
+        content={"success": False, "error": error_msg, "traceback": trace}
+    )
 
 
 @app.get("/", response_model=dict)
@@ -268,7 +307,7 @@ async def ocr_recognize(request: OCRRequest):
         if image is None:
             raise HTTPException(status_code=400, detail="无效的图片数据")
         
-        engine = get_ocr_engine()
+        engine = await ensure_local_ocr_engine()
         if not engine or not engine.is_available:
             raise HTTPException(status_code=503, detail="OCR引擎不可用")
         
