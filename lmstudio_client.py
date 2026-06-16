@@ -22,6 +22,7 @@ class LMStudioClient:
         self.api_url = api_url or settings.lmstudio_api_url
         self.model = model or settings.lmstudio_model
         self.timeout = timeout or settings.lmstudio_timeout
+        self.api_mode = settings.vlm_api_mode.lower()
     
     async def recognize_image(
         self,
@@ -41,6 +42,13 @@ class LMStudioClient:
             识别结果字典
         """
         try:
+            if self.api_mode == "ollama":
+                return await self._recognize_image_ollama(
+                    image_base64=image_base64,
+                    prompt=prompt,
+                    system_prompt=system_prompt
+                )
+
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 payload = {
                     "model": self.model,
@@ -105,6 +113,61 @@ class LMStudioClient:
                 "error": str(e),
                 "text": ""
             }
+
+    async def _recognize_image_ollama(
+        self,
+        image_base64: str,
+        prompt: str,
+        system_prompt: str
+    ) -> Dict[str, Any]:
+        """使用Ollama原生接口识别图片。"""
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                payload = {
+                    "model": self.model,
+                    "prompt": f"{system_prompt}\n\n{prompt}",
+                    "images": [image_base64],
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.1
+                    }
+                }
+
+                response = await client.post(
+                    self.api_url,
+                    json=payload,
+                    headers={"Content-Type": "application/json"}
+                )
+
+                if response.status_code == 200:
+                    result = response.json()
+                    return {
+                        "success": True,
+                        "text": result.get("response", ""),
+                        "raw_response": result
+                    }
+
+                logger.error(f"[Ollama] API调用失败: {response.status_code} - {response.text}")
+                return {
+                    "success": False,
+                    "error": f"API调用失败: {response.status_code}",
+                    "text": ""
+                }
+
+        except httpx.TimeoutException:
+            logger.error("[Ollama] 请求超时")
+            return {
+                "success": False,
+                "error": "请求超时",
+                "text": ""
+            }
+        except Exception as e:
+            logger.error(f"[Ollama] 识别失败: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "text": ""
+            }
     
     async def recognize_with_custom_prompt(
         self,
@@ -130,6 +193,11 @@ class LMStudioClient:
         """检查LMStudio服务是否可用"""
         try:
             async with httpx.AsyncClient(timeout=5) as client:
+                if self.api_mode == "ollama":
+                    base_url = self.api_url.rsplit('/api/generate', 1)[0]
+                    response = await client.get(f"{base_url}/api/tags")
+                    return response.status_code == 200
+
                 base_url = self.api_url.rsplit('/chat/completions', 1)[0]
                 response = await client.get(f"{base_url}/models")
                 return response.status_code == 200

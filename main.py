@@ -168,7 +168,7 @@ async def startup_event():
     logger.info(f"配置 - LMStudio API: {settings.lmstudio_api_url}")
     logger.info(f"配置 - 字符集: {settings.ocr_charset_file}")
     logger.info("=" * 50)
-    
+
     try:
         charset_path = str(PROJECT_ROOT / settings.ocr_charset_file) if settings.ocr_charset_file else None
         init_ocr_engine(

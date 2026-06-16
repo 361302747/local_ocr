@@ -125,6 +125,12 @@ class OCREngine:
     
     def _init_engine(self):
         """初始化底层OCR引擎"""
+        if self.engine_type in ('none', 'disabled', 'off'):
+            logger.info("[OCREngine] 本地OCR引擎已禁用")
+            self._engine = None
+            self._actual_engine_type = None
+            return
+
         if self.engine_type == 'easyocr':
             if self._init_easyocr():
                 return

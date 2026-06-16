@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     lmstudio_api_url: str = "http://localhost:1234/v1/chat/completions"
     lmstudio_model: str = "glm-ocr"
     lmstudio_timeout: int = 60
+    vlm_api_mode: str = "openai"
     
     tesseract_cmd: Optional[str] = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
     
