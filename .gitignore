@@ -12,6 +12,8 @@ venv/
 *.egg
 dist/
 build/
+debug/
+*.zip
 *.so
 .DS_Store
 Thumbs.db

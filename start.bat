@@ -9,6 +9,8 @@ set "OCR_ENGINE=none"
 set "LMSTUDIO_BASE_URL=http://127.0.0.1:1234"
 set "LMSTUDIO_API_URL=%LMSTUDIO_BASE_URL%/v1/chat/completions"
 set "LMSTUDIO_MODEL=glm-ocr"
+set "LMSTUDIO_MODEL_KEY=glm-ocr"
+set "LMSTUDIO_LOAD_TIMEOUT=180"
 set "LMSTUDIO_TIMEOUT=120"
 set "VLM_API_MODE=openai"
 set "VLM_MAX_TOKENS=512"
@@ -19,13 +21,17 @@ echo Backend: LM Studio
 echo ====================================
 echo.
 
-echo [INFO] Checking LM Studio local server on %LMSTUDIO_BASE_URL% ...
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "try { Invoke-RestMethod '%LMSTUDIO_BASE_URL%/v1/models' -TimeoutSec 3 | Out-Null; exit 0 } catch { exit 1 }"
+set "PYTHON=E:\python\ghost_catcher\.venv\Scripts\python.exe"
+if not exist "%PYTHON%" (
+    echo [ERROR] OCR Python environment not found: %PYTHON%
+    set "EXIT_CODE=1"
+    goto :finish
+)
+
+echo [INFO] Preparing LM Studio and model %LMSTUDIO_MODEL% ...
+"%PYTHON%" "%~dp0ensure_lmstudio.py"
 if errorlevel 1 (
-    echo [ERROR] LM Studio local server is not available.
-    echo [INFO] Please open LM Studio, load the GLM-OCR model, and start Local Server.
-    echo [INFO] Expected endpoint: %LMSTUDIO_API_URL%
+    echo [ERROR] Could not prepare LM Studio. See the error above.
     set "EXIT_CODE=1"
     goto :finish
 )
@@ -47,7 +53,7 @@ if not errorlevel 1 (
     goto :finish
 )
 
-uv run python main.py
+"%PYTHON%" main.py
 set "EXIT_CODE=%ERRORLEVEL%"
 
 :finish

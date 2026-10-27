@@ -73,8 +73,7 @@ class LMStudioClient:
                             ]
                         }
                     ],
-                    "max_tokens": 4096,
-                    "num_predict": settings.vlm_max_tokens,
+                    "max_tokens": settings.vlm_max_tokens,
                     "temperature": 0.1
                 }
                 
