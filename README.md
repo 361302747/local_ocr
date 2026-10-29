@@ -3,7 +3,17 @@
 基于 FastAPI 的 OCR 服务，支持 LM Studio GLM-OCR 和按需加载的 EasyOCR。
 
 开发机运行 `start.bat` 时自动准备本机 LM Studio、加载已下载的 `glm-ocr` 并验证 API。
-开发启动脚本使用 `E:\python\ghost_catcher\.venv\Scripts\python.exe`；其他机器需修改该解释器路径或使用分发包。
+源码启动脚本按以下顺序选择 Python：环境变量 `LOCAL_OCR_PYTHON` → 本机原虚拟环境 `E:\python\ghost_catcher\.venv\Scripts\python.exe`（存在时）→ PATH 中的 `python`。本机无需额外设置，远端没有该虚拟环境时自动使用默认 Python。
+可将 `LOCAL_OCR_PYTHON` 设为 `python` 强制使用默认环境，或设为其他 `python.exe` 的完整路径；路径值不要包含额外的引号。显式指定的解释器不可用时直接报错，不自动切换。依赖须安装到实际选中的解释器环境。
+
+```powershell
+# 强制使用 PATH 中的 Python（仅当前 PowerShell 会话）
+$env:LOCAL_OCR_PYTHON = 'python'
+.\start.bat
+
+# 恢复自动选择
+Remove-Item Env:LOCAL_OCR_PYTHON -ErrorAction SilentlyContinue
+```
 
 ## 分发包
 

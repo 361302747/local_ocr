@@ -21,13 +21,21 @@ echo Backend: LM Studio
 echo ====================================
 echo.
 
-set "PYTHON=E:\python\ghost_catcher\.venv\Scripts\python.exe"
-if not exist "%PYTHON%" (
-    echo [ERROR] OCR Python environment not found: %PYTHON%
+set "PYTHON="
+if defined LOCAL_OCR_PYTHON set "PYTHON=%LOCAL_OCR_PYTHON%"
+if not defined PYTHON (
+    if exist "E:\python\ghost_catcher\.venv\Scripts\python.exe" set "PYTHON=E:\python\ghost_catcher\.venv\Scripts\python.exe"
+)
+if not defined PYTHON set "PYTHON=python"
+"%PYTHON%" --version >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Python is unavailable: %PYTHON%
+    echo [INFO] Add Python to PATH or set LOCAL_OCR_PYTHON to python.exe.
     set "EXIT_CODE=1"
     goto :finish
 )
 
+echo [INFO] Python: %PYTHON%
 echo [INFO] Preparing LM Studio and model %LMSTUDIO_MODEL% ...
 "%PYTHON%" "%~dp0ensure_lmstudio.py"
 if errorlevel 1 (
