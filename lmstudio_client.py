@@ -49,7 +49,7 @@ class LMStudioClient:
                     system_prompt=system_prompt
                 )
 
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=self.timeout, trust_env=False) as client:
                 payload = {
                     "model": self.model,
                     "messages": [
@@ -122,7 +122,7 @@ class LMStudioClient:
     ) -> Dict[str, Any]:
         """使用Ollama原生接口识别图片。"""
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=self.timeout, trust_env=False) as client:
                 payload = {
                     "model": self.model,
                     "prompt": f"{system_prompt}\n\n{prompt}",
@@ -193,7 +193,7 @@ class LMStudioClient:
     async def health_check(self) -> bool:
         """检查LMStudio服务是否可用"""
         try:
-            async with httpx.AsyncClient(timeout=5) as client:
+            async with httpx.AsyncClient(timeout=5, trust_env=False) as client:
                 if self.api_mode == "ollama":
                     base_url = self.api_url.rsplit('/api/generate', 1)[0]
                     response = await client.get(f"{base_url}/api/tags")

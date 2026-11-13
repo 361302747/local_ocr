@@ -2,6 +2,8 @@
 
 基于 FastAPI 的 OCR 服务，支持 LM Studio GLM-OCR 和启动时预加载的 EasyOCR。
 
+OCR 服务访问 LM Studio／Ollama 的识别与健康检查接口时使用直连，忽略环境代理；启动阶段的 LM Studio API 探测同样不使用代理。
+
 默认 `OCR_ENGINE=easyocr`，在应用启动阶段加载 EasyOCR，初始化完成后再开始接收请求，避免首次 `/ocr` 请求因加载模型而超过客户端的 2 秒时限。`start.bat` 同样显式启用预加载；直接启动时环境变量或 `.env` 可覆盖默认值。修改后需关闭旧 OCR 服务，再重新运行启动脚本；脚本检测到服务已运行时不会替换它。
 
 开发机运行 `start.bat` 时自动准备本机 LM Studio、加载已下载的 `glm-ocr` 并验证 API。
