@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8765
     
-    ocr_engine: str = "none"
+    ocr_engine: str = "easyocr"
     ocr_lazy_engine: str = "easyocr"
     ocr_languages: List[str] = ["ch_sim"]
     ocr_use_gpu: bool = True

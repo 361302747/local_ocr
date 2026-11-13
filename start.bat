@@ -5,7 +5,7 @@ cd /d "%~dp0"
 
 set "HOST=0.0.0.0"
 set "PORT=8765"
-set "OCR_ENGINE=none"
+set "OCR_ENGINE=easyocr"
 set "LMSTUDIO_BASE_URL=http://127.0.0.1:1234"
 set "LMSTUDIO_API_URL=%LMSTUDIO_BASE_URL%/v1/chat/completions"
 set "LMSTUDIO_MODEL=glm-ocr"

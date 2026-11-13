@@ -1,6 +1,8 @@
 # Local OCR
 
-基于 FastAPI 的 OCR 服务，支持 LM Studio GLM-OCR 和按需加载的 EasyOCR。
+基于 FastAPI 的 OCR 服务，支持 LM Studio GLM-OCR 和启动时预加载的 EasyOCR。
+
+默认 `OCR_ENGINE=easyocr`，在应用启动阶段加载 EasyOCR，初始化完成后再开始接收请求，避免首次 `/ocr` 请求因加载模型而超过客户端的 2 秒时限。`start.bat` 同样显式启用预加载；直接启动时环境变量或 `.env` 可覆盖默认值。修改后需关闭旧 OCR 服务，再重新运行启动脚本；脚本检测到服务已运行时不会替换它。
 
 开发机运行 `start.bat` 时自动准备本机 LM Studio、加载已下载的 `glm-ocr` 并验证 API。
 源码启动脚本按以下顺序选择 Python：环境变量 `LOCAL_OCR_PYTHON` → 本机原虚拟环境 `E:\python\ghost_catcher\.venv\Scripts\python.exe`（存在时）→ PATH 中的 `python`。本机无需额外设置，远端没有该虚拟环境时自动使用默认 Python。
