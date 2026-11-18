@@ -11,7 +11,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $PackageRoot "resource\easyocr\model
 
 $PythonSources = @(
     "config.py", "main.py", "ocr_engine.py", "lmstudio_client.py",
-    "ensure_lmstudio.py"
+    "ensure_lmstudio.py", "activity_progress.py", "assistant_signals.py"
 )
 $SourceFiles = @("requirements.txt", ".env.example", "quick_start.bat")
 $RuntimeRoot = Join-Path $PackageRoot "runtime"

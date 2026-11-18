@@ -43,3 +43,13 @@ EasyOCR 模型不纳入 Git，打包时从本地分发资源读取。
 ```powershell
 & E:\python\ghost_catcher\.venv\Scripts\python.exe -c 'import subprocess,sys; sys.exit(subprocess.run([sys.executable,"-m","unittest","discover","-s","test_script/tools","-p","test_ensure_lmstudio.py","-v"],timeout=30).returncode)'
 ```
+# 宿主机日常统计与助手信号
+
+订阅本服务的虚拟机只访问 OCR 端口，不直接打开宿主 SQLite。接口只在受信任的宿主机／虚拟机网络内开放，不转发到公网。
+
+1. 停止旧日常／挂机助手和旧独立信号服务。不能同时运行两个信号中心。保留旧进度 JSON。
+2. 在宿主机以以后运行 OCR 的同一 Windows 用户，用启动 OCR 的 Python 执行 `activity_progress.py --import-json <旧 activity_daily_progress.json 的绝对路径>`，不需要 OCR 服务已启动。仅在确认无旧统计时使用 `--initialize-empty`；成功后重复导入不会改写统计。精简版入口是 `runtime/activity_progress.pyc`。历史 JSON 不修改；从未写入的数量不会凭空补齐。
+3. 启动 OCR 服务。源代码部署默认查找同级 `ghost_catcher`；部署位置不同时，启动前设置环境变量 `GHOST_CATCHER_PROJECT_ROOT` 为宿主机可访问的脚本库路径。若原信号数据库不在该项目的本地 `runtime/signal_service/state.sqlite3`，用 `GHOST_CATCHER_SIGNAL_DATABASE` 指定原数据库的宿主机本地路径。
+4. 所有虚拟机使用更新后的脚本，令 `config/service_connections.json` 的 `signal_service.transport` 为 `ocr`，共用 host 和 OCR 端口，然后启动助手。旧的信号端口环境覆盖需清除或改成新端口。重启后在线状态由助手新心跳建立。
+
+日常统计库位于宿主机当前用户的 `%LOCALAPPDATA%\GhostCatcher\activity_progress.sqlite3`，不要放进 SMB 目录。断线时客户端保存待提交记录，恢复后补交，服务端按事件 ID 去重。

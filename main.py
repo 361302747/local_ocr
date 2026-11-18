@@ -12,6 +12,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import uvicorn
 import numpy as np
+from starlette.concurrency import run_in_threadpool
+from activity_progress import router as activity_progress_router
+from assistant_signals import open_signal_database, router as assistant_signals_router
 
 from config import settings, PROJECT_ROOT
 from ocr_engine import (
@@ -22,12 +25,31 @@ from ocr_engine import (
 )
 from lmstudio_client import get_lmstudio_client
 
+local_recognition_lock = asyncio.Lock()
+
 logging.basicConfig(
     level=getattr(logging, settings.log_level),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 _local_ocr_load_lock = asyncio.Lock()
+
+
+class BackgroundAccessFilter(logging.Filter):
+    """Keep failures visible without logging every successful assistant poll."""
+
+    def filter(self, record):
+        args = record.args
+        if not isinstance(args, tuple) or len(args) != 5:
+            return True
+        _, method, target, _, status = args
+        if not isinstance(target, str) or not isinstance(status, int) or not 200 <= status < 300:
+            return True
+        path = target.partition("?")[0]
+        return (method, path) not in {
+            ("POST", "/v1/signals"),
+            ("GET", "/v1/activity-progress/snapshot"),
+        }
 
 
 class TextBlock(BaseModel):
@@ -194,8 +216,28 @@ async def ensure_local_ocr_engine():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    access_logger = logging.getLogger("uvicorn.access")
+    background_filter = BackgroundAccessFilter()
+    access_logger.addFilter(background_filter)
+    try:
+        async with service_lifespan(app):
+            yield
+    finally:
+        access_logger.removeFilter(background_filter)
+
+
+@asynccontextmanager
+async def service_lifespan(app: FastAPI):
     await initialize_services()
-    yield
+    broker = await run_in_threadpool(open_signal_database)
+    app.state.assistant_signal_database = broker
+    if broker is None:
+        logger.warning("未找到 ghost_catcher，助手信号接口未启用；请检查 GHOST_CATCHER_PROJECT_ROOT")
+    try:
+        yield
+    finally:
+        if broker is not None:
+            await run_in_threadpool(broker.close)
 
 
 app = FastAPI(
@@ -204,6 +246,8 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+app.include_router(activity_progress_router)
+app.include_router(assistant_signals_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -311,7 +355,8 @@ async def ocr_recognize(request: OCRRequest):
         if not engine or not engine.is_available:
             raise HTTPException(status_code=503, detail="OCR引擎不可用")
         
-        result = recognize_text(image, request.return_details)
+        async with local_recognition_lock:
+            result = await run_in_threadpool(recognize_text, image, request.return_details)
         
         if request.return_details:
             def convert_to_serializable(obj):
@@ -495,6 +540,7 @@ def main():
         host=settings.host,
         port=settings.port,
         reload=False,
+        workers=1,
         log_level=settings.log_level.lower()
     )
 
